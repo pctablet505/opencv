@@ -1,0 +1,53 @@
+name: flann Hamming on NEON
+on:
+  push:
+    branches: [neon-hamming-check]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04-arm, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: check
+      - uses: actions/checkout@v4
+        with:
+          repository: opencv/opencv
+          ref: 3e1cb2371a4c51a2da690ed64f763e94eeb1797e
+          path: opencv
+      - name: Machine and compiler
+        run: |
+          uname -m
+          g++ --version | head -1
+          echo | g++ -dM -E -x c++ - | grep -E '__ARM_NEON |__aarch64__ |__x86_64__ ' || true
+      - name: cvflann::Hamming against an exact popcount, lengths 1 to 64
+        run: |
+          g++ -O2 -std=c++11 -I opencv/modules/flann/include -I opencv/modules/core/include check/hamming_lengths.cpp -o hamming_lengths
+          ./hamming_lengths | tee hamming_lengths.txt
+      - name: Two 61-byte vectors under AddressSanitizer
+        run: |
+          g++ -O1 -g -fsanitize=address -fno-omit-frame-pointer -std=c++11 -DASAN_CASE -I opencv/modules/flann/include -I opencv/modules/core/include check/hamming_lengths.cpp -o hamming_asan
+          ./hamming_asan > hamming_asan.txt 2>&1 || true
+          cat hamming_asan.txt
+      - name: Build OpenCV core, imgproc, flann, features2d
+        run: |
+          cmake -S opencv -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_LIST=core,imgproc,flann,features2d \
+            -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_opencv_apps=OFF -DBUILD_DOCS=OFF \
+            -DBUILD_JAVA=OFF -DBUILD_opencv_python3=OFF -DWITH_OPENCL=OFF -DWITH_IPP=OFF -DWITH_ITT=OFF \
+            -DCMAKE_INSTALL_PREFIX=$PWD/inst > cmake.log
+          cmake --build build -j$(nproc) --target install > build.log
+          tail -1 build.log
+      - name: AKAZE descriptors with FlannBasedMatcher(LSH)
+        run: |
+          g++ -O2 -std=c++11 check/akaze_flann.cpp -I inst/include/opencv4 -L inst/lib -lopencv_features2d -lopencv_flann -lopencv_imgproc -lopencv_core -o akaze_flann
+          LD_LIBRARY_PATH=inst/lib ./akaze_flann | tee akaze_flann.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.os }}
+          path: "*.txt"
