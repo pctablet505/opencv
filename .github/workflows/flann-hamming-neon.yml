@@ -47,6 +47,10 @@ jobs:
         run: |
           g++ -O2 -std=c++11 check/akaze_flann.cpp -I inst/include/opencv4 -L inst/lib -lopencv_features2d -lopencv_flann -lopencv_imgproc -lopencv_core -o akaze_flann
           LD_LIBRARY_PATH=inst/lib ./akaze_flann | tee akaze_flann.txt
+      - name: Reproducer from the issue
+        run: |
+          g++ -O2 -std=c++11 check/issue_snippet.cpp -I inst/include/opencv4 -L inst/lib -lopencv_flann -lopencv_core -o issue_snippet
+          LD_LIBRARY_PATH=inst/lib ./issue_snippet | tee issue_snippet.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
