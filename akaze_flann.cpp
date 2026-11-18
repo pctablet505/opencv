@@ -19,7 +19,8 @@ int main()
     }
     cv::GaussianBlur(img, img, cv::Size(3, 3), 0);
     cv::Mat shifted;
-    cv::warpAffine(img, shifted, (cv::Mat_<double>(2, 3) << 1, 0, 7.5, 0, 1, -4.25), img.size());
+    cv::Mat shift = (cv::Mat_<double>(2, 3) << 1, 0, 7.5, 0, 1, -4.25);
+    cv::warpAffine(img, shifted, shift, img.size());
 
     cv::Ptr<cv::AKAZE> akaze = cv::AKAZE::create();
     std::vector<cv::KeyPoint> k1, k2;
